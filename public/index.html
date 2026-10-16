@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SMS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root { --bg:#fff; --ink:#000; --mute:#737373; --line:#e5e5e5; --err:#b42318; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; }
+  [hidden] { display:none !important; }
+  main { max-width:640px; margin:0 auto; padding:56px 24px 120px; }
+  header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:56px; gap:16px; }
+  h1 { margin:0; font-size:28px; font-weight:600; letter-spacing:-.02em; }
+  h2 { margin:0 0 16px; font-size:15px; font-weight:600; }
+  section { padding:32px 0; border-top:1px solid var(--line); }
+  .top { display:flex; align-items:center; gap:20px; }
+  .conn { display:inline-flex; align-items:center; gap:8px; color:var(--mute); font-size:13px; }
+  .conn i { width:8px; height:8px; border-radius:50%; border:1px solid currentColor; display:inline-block; }
+  .conn.ok { color:var(--ink); } .conn.ok i { background:var(--ink); } .conn.bad { color:var(--err); }
+  .link { background:none; border:0; padding:0; color:var(--mute); font:inherit; font-size:13px; cursor:pointer; text-decoration:underline; }
+  .link:hover { color:var(--ink); }
+
+  label.f { display:block; font-size:13px; color:var(--mute); margin-bottom:6px; }
+  input[type=text], input[type=password], input[type=number], input[type=url], textarea {
+    width:100%; padding:10px 12px; font:inherit; color:var(--ink); background:var(--bg);
+    border:1px solid var(--line); border-radius:6px; outline:none; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible, .drop:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  textarea { min-height:120px; resize:vertical; line-height:1.5; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid .wide { grid-column:1 / -1; }
+  .check { display:inline-flex; gap:8px; align-items:center; cursor:pointer; color:var(--ink); }
+  .check input { accent-color:#000; }
+  .hint { color:var(--mute); font-size:13px; margin:12px 0 0; }
+
+  button { font:inherit; cursor:pointer; padding:10px 18px; border-radius:6px; border:1px solid var(--ink); background:var(--ink); color:#fff; }
+  button.ghost { background:var(--bg); color:var(--ink); border-color:var(--line); }
+  button.ghost:hover:not(:disabled) { border-color:var(--ink); }
+  button:disabled { opacity:.35; cursor:not-allowed; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:20px; }
+
+  .drop { border:1px dashed #bdbdbd; border-radius:6px; padding:28px; text-align:center; color:var(--mute); cursor:pointer; }
+  .drop.over { border-color:var(--ink); color:var(--ink); }
+  .drop b { color:var(--ink); font-weight:500; }
+  .tablewrap { margin-top:20px; max-height:300px; overflow:auto; border-top:1px solid var(--line); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:9px 8px 9px 0; border-bottom:1px solid var(--line); font-weight:400; }
+  th { color:var(--mute); font-size:13px; position:sticky; top:0; background:var(--bg); }
+  td.st { color:var(--mute); white-space:nowrap; } td.st.ok { color:var(--ink); } td.st.bad { color:var(--err); }
+  td.x { width:28px; text-align:right; padding-right:0; }
+  td.x button { border:0; background:none; color:var(--mute); padding:0 4px; font-size:18px; line-height:1; }
+  td.x button:hover { color:var(--ink); }
+  .summary { margin-top:12px; color:var(--mute); font-size:13px; }
+
+  .meta { display:flex; justify-content:space-between; gap:16px; color:var(--mute); font-size:13px; margin-top:6px; }
+  .preview { margin-top:16px; padding:14px 16px; border-left:2px solid var(--ink); white-space:pre-wrap; word-break:break-word; }
+  .preview small { display:block; color:var(--mute); font-size:13px; margin-bottom:4px; }
+  .card { margin-top:20px; max-width:360px; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .card img { display:block; width:100%; aspect-ratio:1.91/1; object-fit:cover; background:#f2f2f2; }
+  .card .c { padding:12px 14px; }
+  .card b { display:block; font-weight:600; }
+  .card span { display:block; color:var(--mute); font-size:13px; }
+
+  .count { font-size:64px; font-weight:300; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1; }
+  .count span { color:var(--mute); }
+  .bar { height:2px; background:var(--line); margin:20px 0 8px; }
+  .bar div { height:100%; width:0; background:var(--ink); transition:width .25s; }
+  @media (prefers-reduced-motion: reduce) { .bar div { transition:none; } }
+
+  #login { max-width:360px; margin:0 auto; padding:18vh 24px 0; }
+  #login h1 { margin-bottom:32px; }
+  #gbtn { min-height:44px; }
+  .or { color:var(--mute); font-size:13px; margin:24px 0 16px; }
+  #loginErr { color:var(--err); font-size:13px; min-height:20px; margin:8px 0 0; }
+  @media (max-width:520px) { .grid { grid-template-columns:1fr; } main { padding-top:32px; } .count { font-size:52px; } }
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <h1>SMS</h1>
+  <div id="gwrap" hidden>
+    <div id="gbtn"></div>
+  </div>
+  <div id="pwrap" hidden>
+    <p class="or" id="or" hidden>o con contraseña</p>
+    <label class="f" for="pw">Contraseña</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div class="row" style="margin-top:12px"><button id="enter">Entrar</button></div>
+  </div>
+  <p id="loginErr"></p>
+</div>
+
+<main id="app" hidden>
+  <header>
+    <h1>SMS</h1>
+    <div class="top">
+      <span id="conn" class="conn"><i></i><span id="connTxt">Sin verificar</span></span>
+      <button class="link" id="test">Probar</button>
+      <button class="link" id="logout">Salir</button>
+    </div>
+  </header>
+
+  <section>
+    <h2>Contactos</h2>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Cargar archivo de contactos">
+      <b>Soltá tu Excel acá</b> o hacé clic para elegirlo<br>
+      <span>Dos columnas: nombre y teléfono (.xlsx, .xls o .csv)</span>
+    </div>
+    <input id="file" type="file" accept=".xlsx,.xls,.csv" hidden>
+    <div id="listWrap" hidden>
+      <div class="tablewrap"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Estado</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="summary" id="summary"></div>
+      <div class="grid" style="margin-top:16px">
+        <div class="wide"><label class="f" for="cc">Código de país para números sin prefijo</label><input id="cc" type="text" value="54"></div>
+      </div>
+      <div class="row"><button class="ghost" id="clear">Vaciar lista</button></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Enlace con vista previa</h2>
+    <div class="grid">
+      <div class="wide"><label class="f" for="lt">Título</label><input id="lt" type="text" maxlength="90" placeholder="Sábado en Bruma"></div>
+      <div class="wide"><label class="f" for="ld">Descripción</label><input id="ld" type="text" maxlength="200" placeholder="Reservá tu combo antes de que se agote."></div>
+      <div class="wide"><label class="f" for="li">Imagen (URL pública, 1200×630)</label><input id="li" type="url" placeholder="https://tudominio.com/img/sabado.jpg"></div>
+      <div><label class="f" for="lu">Destino del botón</label><input id="lu" type="url" placeholder="https://wa.me/549341..."></div>
+      <div><label class="f" for="lb">Texto del botón</label><input id="lb" type="text" maxlength="30" value="Ver más"></div>
+    </div>
+    <div class="row" style="margin-top:16px"><label class="check"><input type="checkbox" id="lr"> Ir directo al destino al abrir el enlace</label></div>
+    <div class="row">
+      <button class="ghost" id="mk">Crear enlace</button>
+    </div>
+    <div style="margin-top:20px">
+      <label class="f" for="link">Enlace que se agrega al final del mensaje</label>
+      <input id="link" type="url" placeholder="Se completa solo al crearlo. También podés pegar uno propio.">
+      <p class="hint" id="mkHint"></p>
+      <p class="hint" id="linkWarn" style="color:var(--err)" hidden></p>
+    </div>
+    <div class="card" id="card" hidden>
+      <img id="cardImg" alt="">
+      <div class="c"><b id="cardT"></b><span id="cardD"></span><span id="cardH"></span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Mensaje</h2>
+    <textarea id="msg" placeholder="Hola {nombre}, te esperamos este sábado."></textarea>
+    <div class="meta"><span>{nombre} primer nombre · {nombre_completo} nombre completo</span><span id="chars"></span></div>
+    <div class="preview" id="preview" hidden><small>Vista previa</small><span id="previewTxt"></span></div>
+  </section>
+
+  <section>
+    <h2>Envío</h2>
+    <div class="count" id="count">0<span> / 0</span></div>
+    <div class="bar"><div id="barfill"></div></div>
+    <div class="meta"><span id="state">Cargá contactos y escribí el mensaje.</span><span id="errs"></span></div>
+    <div class="grid" style="margin-top:24px">
+      <div><label class="f" for="dmin">Pausa mínima entre envíos (seg)</label><input id="dmin" type="number" min="1" value="8"></div>
+      <div><label class="f" for="dmax">Pausa máxima (seg)</label><input id="dmax" type="number" min="1" value="15"></div>
+    </div>
+    <div class="row">
+      <button id="start" disabled>Enviar</button>
+      <button class="ghost" id="pause" disabled>Pausar</button>
+      <button class="ghost" id="stop" disabled>Detener</button>
+      <button class="ghost" id="export" disabled>Descargar resultados</button>
+    </div>
+    <p class="hint">Dejá esta pestaña abierta mientras se envía. Si la cerrás, el envío se detiene y podés retomarlo después.</p>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let contacts = [];
+let running = false, paused = false, stopped = false;
+
+/* ---------- Sesión ---------- */
+async function api(path, body) {
+  const r = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  let j = {};
+  try { j = await r.json(); } catch (e) {}
+  return { status: r.status, ...j };
+}
+let loginReady = false;
+async function setupLogin() {
+  if (loginReady) return;
+  loginReady = true;
+  const cfg = await api('/api/config');
+  $('pwrap').hidden = !cfg.password;
+  $('gwrap').hidden = !cfg.googleClientId;
+  $('or').hidden = !(cfg.password && cfg.googleClientId);
+  if (!cfg.password && !cfg.googleClientId) $('loginErr').textContent = 'Falta configurar el acceso en Vercel (ver LEEME).';
+  if (cfg.googleClientId) {
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client';
+    sc.async = true;
+    sc.onload = () => {
+      google.accounts.id.initialize({ client_id: cfg.googleClientId, callback: (r) => googleLogin(r.credential) });
+      google.accounts.id.renderButton($('gbtn'), { theme: 'outline', size: 'large', text: 'signin_with', width: 280 });
+    };
+    sc.onerror = () => { $('loginErr').textContent = 'No se pudo cargar el acceso con Google.'; };
+    document.head.appendChild(sc);
+  }
+}
+function showLogin(msg) {
+  $('app').hidden = true; $('login').hidden = false;
+  $('loginErr').textContent = msg || '';
+  $('pw').value = '';
+  setupLogin();
+}
+async function showApp() {
+  $('login').hidden = true; $('app').hidden = false;
+  testConn();
+}
+async function boot() {
+  const me = await api('/api/me');
+  if (me.status === 401) return showLogin();
+  showApp();
+}
+async function googleLogin(credential) {
+  $('loginErr').textContent = '';
+  const r = await api('/api/google', { credential });
+  if (r.ok) showApp(); else $('loginErr').textContent = r.error || 'No se pudo entrar con Google';
+}
+async function login() {
+  $('loginErr').textContent = '';
+  const r = await api('/api/login', { password: $('pw').value });
+  if (r.ok) showApp(); else $('loginErr').textContent = r.error || 'No se pudo entrar';
+}
+$('enter').onclick = login;
+$('pw').onkeydown = (e) => { if (e.key === 'Enter') login(); };
+$('logout').onclick = async () => {
+  await api('/api/logout', {});
+  try { if (window.google && google.accounts) google.accounts.id.disableAutoSelect(); } catch (e) {}
+  showLogin();
+};
+
+function setConn(kind, text) { $('conn').className = 'conn ' + kind; $('connTxt').textContent = text; }
+async function testConn() {
+  setConn('', 'Probando…');
+  const r = await api('/api/ping', {});
+  if (r.status === 401) return showLogin('Sesión vencida');
+  setConn(r.ok ? 'ok' : 'bad', r.ok ? 'Celular conectado' : (r.detail || 'Sin conexión'));
+}
+$('test').onclick = testConn;
+
+/* ---------- Ajustes locales (sin datos sensibles) ---------- */
+const SAVE = ['cc', 'msg', 'dmin', 'dmax', 'lt', 'ld', 'li', 'lu', 'lb', 'link'];
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('sms-cfg') || '{}');
+    SAVE.forEach((k) => { if (s[k] !== undefined) $(k).value = s[k]; });
+    $('lr').checked = !!s.lr;
+  } catch (e) {}
+}
+function saveSettings() {
+  try {
+    const s = { lr: $('lr').checked };
+    SAVE.forEach((k) => (s[k] = $(k).value));
+    localStorage.setItem('sms-cfg', JSON.stringify(s));
+  } catch (e) {}
+}
+
+/* ---------- Teléfonos ---------- */
+function normalize(raw) {
+  let d = String(raw == null ? '' : raw).trim();
+  if (!d) return null;
+  const plus = d.startsWith('+');
+  d = d.replace(/\D/g, '');
+  if (!d) return null;
+  if (plus) return d.length >= 8 && d.length <= 15 ? '+' + d : null;
+  if (d.startsWith('00')) { d = d.slice(2); return d.length >= 8 && d.length <= 15 ? '+' + d : null; }
+  const cc = $('cc').value.replace(/\D/g, '') || '54';
+  if (d.startsWith(cc) && d.length >= cc.length + 8) return '+' + d;
+  d = d.replace(/^0/, '');
+  if (cc === '54' && d.length === 12) {
+    for (const a of [2, 3, 4]) { if (d.substr(a, 2) === '15') { d = d.slice(0, a) + d.slice(a + 2); break; } }
+  }
+  if (d.length === 10) return '+' + cc + d;
+  if (d.length >= 11 && d.length <= 15) return '+' + d;
+  return null;
+}
+
+/* ---------- Archivo ---------- */
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }).filter((r) => r.some((v) => String(v).trim()));
+      if (!rows.length) return alert('El archivo está vacío.');
+      const first = rows[0].map(String);
+      const hasHeader = first.join('').replace(/\D/g, '').length < 7;
+      let ni = 0, ti = 1;
+      if (hasHeader) {
+        const n = first.findIndex((v) => /nombre|name|contacto/i.test(v));
+        const t = first.findIndex((v) => /tel|cel|phone|n[uú]mero|whats|m[oó]vil/i.test(v));
+        if (n >= 0) ni = n;
+        if (t >= 0) ti = t;
+      }
+      const data = hasHeader ? rows.slice(1) : rows;
+      const seen = new Set();
+      contacts = data.map((r) => {
+        const tel = normalize(r[ti]);
+        const dup = tel && seen.has(tel);
+        if (tel) seen.add(tel);
+        return { nombre: String(r[ni] || '').trim(), raw: String(r[ti] || ''), tel, valid: !!tel && !dup, status: tel ? (dup ? 'duplicado' : 'pendiente') : 'inválido', err: '' };
+      });
+      render();
+    } catch (err) { alert('No se pudo leer el archivo: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } };
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); };
+$('file').onchange = (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; };
+$('clear').onclick = () => { if (running) return; contacts = []; render(); };
+
+/* ---------- Enlace con vista previa ---------- */
+function updateCard() {
+  const t = $('lt').value.trim();
+  $('card').hidden = !t;
+  $('cardT').textContent = t;
+  $('cardD').textContent = $('ld').value.trim();
+  let host = location.host;
+  try { host = new URL($('link').value.trim()).host; } catch (e) {}
+  $('cardH').textContent = host;
+  const foreign = !!($('lt').value.trim() && $('link').value.trim() && host !== location.host);
+  $('linkWarn').hidden = !foreign;
+  $('linkWarn').textContent = foreign ? 'Este enlace no pasa por la plataforma, así que la imagen de la tarjeta no se va a ver. Tocá "Crear enlace". Si pegaste un enlace propio, la tarjeta depende de ese sitio.' : '';
+  const img = $('cardImg'), src = $('li').value.trim();
+  img.hidden = !src;
+  if (src && img.getAttribute('src') !== src) img.src = src;
+  img.onerror = () => { img.hidden = true; };
+  img.onload = () => { img.hidden = false; };
+}
+$('mk').onclick = async () => {
+  if (!$('lt').value.trim()) { $('mkHint').textContent = 'Escribí un título para crear el enlace.'; return; }
+  $('mk').disabled = true; $('mkHint').textContent = 'Creando…';
+  const r = await api('/api/campaign', { title: $('lt').value, description: $('ld').value, image: $('li').value, url: $('lu').value, button: $('lb').value, redirect: $('lr').checked });
+  $('mk').disabled = false;
+  if (r.status === 401) return showLogin('Sesión vencida');
+  if (!r.ok) { $('mkHint').textContent = r.error || 'No se pudo crear el enlace.'; return; }
+  $('link').value = r.link;
+  $('mkHint').textContent = r.short ? 'Enlace creado.' : 'Enlace creado, pero es largo. Conectá Upstash Redis en Vercel para tener enlaces cortos.';
+  onChange();
+  setTimeout(() => {
+    if ($('link').value.trim() !== r.link) {
+      $('link').value = r.link;
+      $('mkHint').textContent = 'Algo cambió el enlace después de crearlo (puede ser una extensión del navegador). Lo restauré. Probá en una ventana de incógnito si vuelve a pasar.';
+      onChange();
+    }
+  }, 400);
+};
+
+/* ---------- Mensaje ---------- */
+const GSM = /^[A-Za-z0-9 @£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-.\/:;<=>?¡ÄÖÑÜ§¿äöñüà\r\n^{}\\\[~\]|€]*$/;
+function personalize(c) {
+  const full = c.nombre || '';
+  const first = full.split(/\s+/)[0] || '';
+  const text = $('msg').value.replace(/\{nombre_completo\}/gi, full).replace(/\{nombre\}/gi, first).trim();
+  const link = $('link').value.trim();
+  return link ? (text ? text + '\n' + link : link) : text;
+}
+function updateMessageInfo() {
+  const sample = contacts.find((c) => c.valid) || { nombre: 'Juan Pérez' };
+  const out = personalize(sample);
+  const uni = !GSM.test(out);
+  const len = out.length;
+  const per = uni ? 70 : 160, multi = uni ? 67 : 153;
+  const parts = len === 0 ? 0 : len <= per ? 1 : Math.ceil(len / multi);
+  $('chars').textContent = len ? `${len} caracteres · ${parts} SMS${uni ? ' (con tildes o símbolos: 70 por SMS)' : ''}` : '';
+  $('preview').hidden = !out;
+  $('previewTxt').textContent = out;
+}
+function onChange() { updateMessageInfo(); updateCard(); refreshButtons(); saveSettings(); }
+['msg', 'link', 'lt', 'ld', 'li', 'lu', 'lb'].forEach((k) => $(k).addEventListener('input', onChange));
+$('lr').addEventListener('change', saveSettings);
+
+/* ---------- Render ---------- */
+const LABEL = { pendiente: 'Pendiente', enviando: 'Enviando…', enviado: 'Enviado', error: 'Error', 'inválido': 'Número inválido', duplicado: 'Repetido' };
+function render() {
+  $('listWrap').hidden = !contacts.length;
+  const tb = $('rows');
+  tb.innerHTML = '';
+  contacts.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    const cls = c.status === 'enviado' ? 'ok' : (c.status === 'error' || c.status === 'inválido') ? 'bad' : '';
+    const td = (txt, klass) => { const e = document.createElement('td'); if (klass) e.className = klass; e.textContent = txt; return e; };
+    tr.append(td(c.nombre || '—'), td(c.tel || c.raw), td(LABEL[c.status] + (c.err ? ': ' + c.err : ''), 'st ' + cls));
+    const x = document.createElement('td'); x.className = 'x';
+    const b = document.createElement('button'); b.textContent = '×'; b.title = 'Quitar'; b.setAttribute('aria-label', 'Quitar contacto');
+    b.onclick = () => { if (running) return; contacts.splice(i, 1); render(); };
+    x.append(b); tr.append(x); tb.append(tr);
+  });
+  const ok = contacts.filter((c) => c.valid).length;
+  $('summary').textContent = `${ok} con número válido de ${contacts.length}`;
+  updateMessageInfo();
+  renderProgress();
+  refreshButtons();
+}
+function renderProgress() {
+  const total = contacts.filter((c) => c.valid).length;
+  const sent = contacts.filter((c) => c.valid && c.status === 'enviado').length;
+  const errs = contacts.filter((c) => c.valid && c.status === 'error').length;
+  $('count').innerHTML = `${sent}<span> / ${total}</span>`;
+  $('barfill').style.width = total ? (sent / total * 100) + '%' : '0';
+  $('errs').textContent = errs ? `${errs} con error` : '';
+  $('errs').style.color = errs ? 'var(--err)' : '';
+}
+function refreshButtons() {
+  const pending = contacts.filter((c) => c.valid && c.status !== 'enviado').length;
+  $('start').disabled = running || !pending || !$('msg').value.trim();
+  $('pause').disabled = !running;
+  $('stop').disabled = !running;
+  $('export').disabled = !contacts.length;
+  $('start').textContent = contacts.some((c) => c.status === 'error') ? 'Reintentar y enviar' : 'Enviar';
+}
+
+/* ---------- Envío ---------- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function waitInterruptible(ms) { const end = Date.now() + ms; while (Date.now() < end && !stopped) await sleep(200); }
+$('pause').onclick = () => {
+  paused = !paused;
+  $('pause').textContent = paused ? 'Reanudar' : 'Pausar';
+  $('state').textContent = paused ? 'En pausa' : 'Enviando…';
+};
+$('stop').onclick = () => { stopped = true; paused = false; $('pause').textContent = 'Pausar'; };
+
+$('start').onclick = async () => {
+  if (running) return;
+  const queue = contacts.filter((c) => c.valid && c.status !== 'enviado');
+  if (!queue.length) return;
+  if (!confirm(`Se van a enviar ${queue.length} mensajes desde tu celular. ¿Continuar?`)) return;
+  saveSettings();
+  running = true; paused = false; stopped = false;
+  $('state').textContent = 'Enviando…';
+  refreshButtons();
+  const min = Math.max(1, Number($('dmin').value) || 8);
+  const max = Math.max(min, Number($('dmax').value) || 15);
+  let expired = false;
+
+  for (let i = 0; i < queue.length; i++) {
+    while (paused && !stopped) await sleep(250);
+    if (stopped) break;
+    const c = queue[i];
+    c.status = 'enviando'; c.err = ''; render();
+    try {
+      const r = await api('/api/send', { to: c.tel, message: personalize(c) });
+      if (r.status === 401) { c.status = 'pendiente'; expired = true; break; }
+      if (r.ok) c.status = 'enviado'; else { c.status = 'error'; c.err = r.error || 'No se pudo enviar'; }
+    } catch (e) { c.status = 'error'; c.err = 'Sin conexión a internet'; }
+    render();
+    if (i < queue.length - 1) await waitInterruptible((min + Math.random() * (max - min)) * 1000);
+  }
+
+  const left = contacts.filter((c) => c.valid && c.status !== 'enviado').length;
+  $('state').textContent = expired ? 'Sesión vencida' : stopped ? 'Detenido' : left ? 'Terminó con errores' : 'Envío completo';
+  running = false; paused = false; stopped = false;
+  $('pause').textContent = 'Pausar';
+  render();
+  if (expired) showLogin('Sesión vencida. Entrá de nuevo para retomar.');
+};
+
+$('export').onclick = () => {
+  const esc = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+  const lines = ['nombre,telefono,estado,detalle', ...contacts.map((c) => [c.nombre, c.tel || c.raw, c.status, c.err].map(esc).join(','))];
+  const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'resultados-sms.csv'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* ---------- Inicio ---------- */
+loadSettings();
+$('cc').addEventListener('change', () => {
+  contacts.forEach((c) => { const t = normalize(c.raw); c.tel = t; c.valid = !!t && c.status !== 'duplicado'; if (c.status !== 'enviado') c.status = t ? 'pendiente' : 'inválido'; });
+  render(); saveSettings();
+});
+['dmin', 'dmax'].forEach((k) => $(k).addEventListener('change', saveSettings));
+render();
+updateCard();
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": null,
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/c/:slug", "destination": "/api/c?slug=:slug" },
+    { "source": "/l", "destination": "/api/c" }
+  ]
+}
